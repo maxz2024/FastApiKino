@@ -14,6 +14,7 @@ def execute_query(query, params=None, fetch_one=False):
     """
     # Подключение к базе данных (можно указать полный путь к файлу базы данных)
     connection = sqlite3.connect('mydatabase.db')
+
     
     def dict_factory(cursor, row):
         d = {}
@@ -35,14 +36,15 @@ def execute_query(query, params=None, fetch_one=False):
 
         # Получение результата запроса
         if fetch_one:
-            result = cursor.fetchone()
+            result: dict[str, str] | list[dict[str, str]] = cursor.fetchone()
         else:
-            result = cursor.fetchall()
+            result: dict[str, str] | list[dict[str, str]] = cursor.fetchall()
 
         # Подтверждение изменений (если были)
         connection.commit()
-
+       
         return True, result
+    
 
     except sqlite3.Error as e:
         return False, f"Ошибка выполнения SQL-запроса: {e}"

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Annotated
 from fastapi import APIRouter, Response, Cookie
 from pydantic import BaseModel
 from utils.sqlite_execute import execute_query
@@ -8,14 +8,14 @@ router = APIRouter(prefix="/user", tags=["User"])
 
 
 class ResponseModel(BaseModel):
-    status: Literal[200, 404]
+    status: Literal["200", "404"]
     data: dict
     msg: str
 
 
 @router.post("/auth", response_model=ResponseModel)
 def Auth_User(
-    name: str, login: str, password: str, role: Literal["user", "create"] = "user"
+    name: str, login: str, password: str, role: Literal["user", "creative"] = "user"
 ):
     """Авторизация пользователя"""
 
@@ -24,19 +24,19 @@ def Auth_User(
     status_query, result1 = execute_query(query1, params1)
     if status_query:
         if len(result1) != 0:
-            return {"status": 404, "data": {}, "msg": "Такой логин уже занят!"}
+            return ResponseModel(status="404", data={}, msg="Такой логин уже занят!")
     else:
-        return {"status": 200, "data": {}, "msg": result1}
+        return ResponseModel(status="404", data={}, msg=result1)
 
     query2 = f"Insert Into User(name, login, password, role) Values(?, ?, ?, ?);"
     params2 = (name, login, password, role)
-    status_query, result2 = execute_query(query2, params2)
-
+    status_query, result2 = execute_query(query2, params2, fetch_one=True)
     if status_query:
-        if len(result2) == 0:
-            return {"status": 200, "data": {}, "msg": "Вы успешно зарегистрировались"}
+        return ResponseModel(
+            status="200", data={}, msg="Вы успешно зарегистрировались"
+        )
     else:
-        return {"status": 404, "data": {}, "msg": result2}
+        return ResponseModel(status="404", data={}, msg=result2)
 
 
 @router.post("/login", response_model=ResponseModel)
@@ -44,37 +44,87 @@ def Login_User(
     response: Response,
     login: str,
     password: str,
-    token: str | None = Cookie(default=None),
+    token: Annotated[str | None, Cookie()] = None,
 ):
     """Вход пользователя"""
 
     if token:
-        return {
-            "status": 200,
-            "data": decode_token(token),
-            "msg": "Вход уже был выполнен.",
-        }
+        if decode_token(token).get("user_id"):
+            return ResponseModel(
+                status="200",
+                data=decode_token(token),
+                msg="Вход уже был выполнен.",
+            )
 
     query = f"Select * from User where User.login == ? and User.password == ?"
     params = (login, password)
-    status_query, result = execute_query(query, params)
+    status_query, result = execute_query(query, params, fetch_one=True)
     if status_query:
-        response.set_cookie(
-            "token",
-            encode_token({"user_id": result[0]["id"], "login": result[0]["login"]}),
-        )
-        return {"status": 200, "data": result, "msg": "Вход выполнен"}
+        if result.get("id"):
+            response.set_cookie(
+                "token",
+                encode_token({"user_id": result["id"], "login": result["login"]}),
+            )
+            return ResponseModel(status='200', data=result, msg="Вход выполнен")
+        else:
+            return ResponseModel(
+                status='404',
+                data={},
+                msg="Ошибка входа, проверьте логин и пароль.",
+            )
     else:
-        return {
-            "status": 404,
-            "data": {},
-            "msg": "Ошибка входа, проверьте логин и пароль.",
-        }
+        return ResponseModel(status="404", data={}, msg=result)
 
 
 @router.get("/current", response_model=ResponseModel)
-def Current_User(token: str | None = Cookie(default=None)):
+def Current_User(token: Annotated[str | None, Cookie()] = None):
+    """Получение текущего пользователя"""
+
     if token == None:
-        return {"status": 404, "data": {}, "msg": "Токен не найден."}
+        return ResponseModel(status="404", data={}, msg="Токен не найден.")
     else:
-        return {"status": 200, "data": decode_token(token), "msg": "Текущий токен"}
+        if decode_token(token).get("user_id"):
+            return ResponseModel(status="404", data={}, msg="Токен не верный.")
+        return ResponseModel(
+            status="200", data=decode_token(token), msg=""
+        )
+
+
+@router.get("/logout", response_model=ResponseModel)
+def Logout_User(response: Response, token: Annotated[str | None, Cookie()] = None):
+    """Выход пользователя"""
+
+    if token:
+        response.delete_cookie("token")
+        return ResponseModel(status="200", data={}, msg="Выход выполнен.")
+    else:
+        return ResponseModel(status="404", data={}, msg="Выход не возможен.")
+
+@router.post("/edit", response_model=ResponseModel)
+def Edit_User(key: Literal['name', 'login', 'password'], value: str, token: Annotated[str | None, Cookie()] = None,):
+    """Редактирование данных о пользователе
+    :key - название атрибута для изменения
+    :value - значение на которое надо поменять"""
+    
+    if token == None:
+        return ResponseModel(status="404", data={}, msg="Вы не авторизованы.")
+    else:
+        if decode_token(token).get("id"):
+            return ResponseModel(status="404", data={}, msg="Токен не верный.")
+        
+    query1 = "Select * from User where User.id == ?" 
+    params1 = (decode_token(token)["user_id"],)
+    status_query1, result1 = execute_query(query1, params1, fetch_one=True)
+    if status_query1:
+        query2 = f"Update User set {key}=? where id= ?"
+        
+        params2 = (value,decode_token(token)["user_id"])
+        status_query2, result2 = execute_query(query2, params2, fetch_one=True)
+        if status_query2:
+            status_query3, result3 = execute_query(query1, params1, fetch_one=True)
+            
+            return ResponseModel(status='200',data=result3,msg="Данные изменены.")
+        else:
+            return ResponseModel(status='404', data=result2, msg="result2")
+    else:
+        return ResponseModel(status='404', data={}, msg="Пользователь с таким токеном не существует.")
