@@ -1,0 +1,1 @@
+MODEL = "Creative(code_avtor integer Primary Key AUTOINCREMENT, user_id integer, FOREIGN KEY(user_id) REFERENCES User(id))"
