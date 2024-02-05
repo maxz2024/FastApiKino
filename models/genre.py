@@ -1,0 +1,1 @@
+MODEL = "Genre(id Integer Primary Key, name Text Not Null)"

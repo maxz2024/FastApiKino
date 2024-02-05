@@ -1,2 +1,2 @@
-MODEL = "User(id integer Primary Key AUTOINCREMENT, name text, login text, password text)"
+MODEL = "User(id integer Primary Key AUTOINCREMENT, name text NOT NULL, login text NOT NULL, password text NOT NULL)"
 

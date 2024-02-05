@@ -60,7 +60,7 @@ def Login_User(
     params = (login, password)
     status_query, result = execute_query(query, params, fetch_one=True)
     if status_query:
-        if result.get("id"):
+        if result:
             response.set_cookie(
                 "token",
                 encode_token({"user_id": result["id"], "login": result["login"], "role": "user"}),
