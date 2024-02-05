@@ -15,7 +15,7 @@ class ResponseModel(BaseModel):
 
 @router.post("/auth", response_model=ResponseModel)
 def Auth_User(
-    name: str, login: str, password: str, role: Literal["user", "creative"] = "user"
+    name: str, login: str, password: str,
 ):
     """Авторизация пользователя"""
 
@@ -28,8 +28,8 @@ def Auth_User(
     else:
         return ResponseModel(status="404", data={}, msg=result1)
 
-    query2 = f"Insert Into User(name, login, password, role) Values(?, ?, ?, ?);"
-    params2 = (name, login, password, role)
+    query2 = f"Insert Into User(name, login, password) Values(?, ?, ?);"
+    params2 = (name, login, password)
     status_query, result2 = execute_query(query2, params2, fetch_one=True)
     if status_query:
         return ResponseModel(
@@ -63,7 +63,7 @@ def Login_User(
         if result.get("id"):
             response.set_cookie(
                 "token",
-                encode_token({"user_id": result["id"], "login": result["login"]}),
+                encode_token({"user_id": result["id"], "login": result["login"], "role": "user"}),
             )
             return ResponseModel(status='200', data=result, msg="Вход выполнен")
         else:
@@ -77,17 +77,27 @@ def Login_User(
 
 
 @router.get("/current", response_model=ResponseModel)
-def Current_User(token: Annotated[str | None, Cookie()] = None):
+def Current_User(response: Response, token: Annotated[str | None, Cookie()] = None):
     """Получение текущего пользователя"""
-
     if token == None:
         return ResponseModel(status="404", data={}, msg="Токен не найден.")
     else:
-        if decode_token(token).get("user_id"):
+        if not decode_token(token).get("user_id"):
             return ResponseModel(status="404", data={}, msg="Токен не верный.")
+        else:
+            query1 = "Select * from User where User.id == ?" 
+            params1 = (decode_token(token)["user_id"],)
+            status_query1, result1 = execute_query(query1, params1, fetch_one=True)
+            if status_query1:
+                if not result1:
+                    response.delete_cookie("token")
+                    return ResponseModel(status='404', data={}, msg="Пользователь с таким токеном не существует.")
+            else:
+                return ResponseModel(status='404', data={}, msg=result1)
         return ResponseModel(
             status="200", data=decode_token(token), msg=""
         )
+
 
 
 @router.get("/logout", response_model=ResponseModel)
@@ -109,13 +119,15 @@ def Edit_User(key: Literal['name', 'login', 'password'], value: str, token: Anno
     if token == None:
         return ResponseModel(status="404", data={}, msg="Вы не авторизованы.")
     else:
-        if decode_token(token).get("id"):
+        if not decode_token(token).get("user_id"):
             return ResponseModel(status="404", data={}, msg="Токен не верный.")
         
     query1 = "Select * from User where User.id == ?" 
     params1 = (decode_token(token)["user_id"],)
     status_query1, result1 = execute_query(query1, params1, fetch_one=True)
     if status_query1:
+        if not result1.get("id"):
+            return ResponseModel(status='404', data={}, msg="Пользователь с таким токеном не существует.")
         query2 = f"Update User set {key}=? where id= ?"
         
         params2 = (value,decode_token(token)["user_id"])
@@ -125,6 +137,6 @@ def Edit_User(key: Literal['name', 'login', 'password'], value: str, token: Anno
             
             return ResponseModel(status='200',data=result3,msg="Данные изменены.")
         else:
-            return ResponseModel(status='404', data=result2, msg="result2")
+            return ResponseModel(status='404', data=result2, msg="")
     else:
-        return ResponseModel(status='404', data={}, msg="Пользователь с таким токеном не существует.")
+        return ResponseModel(status='404', data={}, msg=result1)

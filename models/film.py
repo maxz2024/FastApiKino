@@ -1,1 +1,1 @@
-MODEL = "Film(Id Integer Primary Key AUTOINCREMENT, code_avtor Integer, name Text, description Text, genre Text, FOREIGN KEY(code_avtor) REFERENCES User(id))"
+MODEL = "Film(Id Integer Primary Key AUTOINCREMENT, author_id Integer NOT NULL, name Text NOT NULL, description Text NOT NULL, genre Text NOT NULL, population  float NOT NULL,  date date NOT NULL, FOREIGN KEY(author_id) REFERENCES Author(id))"
