@@ -1,5 +1,5 @@
 import sqlite3
-from models import author, user, film, genre, FilmGenres
+from app.models import author, user, film, genre, FilmGenres
 
 con = sqlite3.connect('mydatabase.db')
 cursor = con.cursor()

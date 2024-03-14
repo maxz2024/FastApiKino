@@ -3,8 +3,8 @@ import json
 from typing import Literal, Annotated
 from fastapi import APIRouter, Response, Cookie
 from pydantic import BaseModel, Field
-from utils.sqlite_execute import execute_query
-from utils.jwt_encoding import encode_token, decode_token
+from app.utils.sqlite_execute import execute_query
+from app.utils.jwt_encoding import encode_token, decode_token
 
 router = APIRouter(prefix="/film", tags=["Film"])
 
